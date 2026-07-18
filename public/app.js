@@ -1,4 +1,4 @@
-// ChoreCam prototype: egocentric hand-task capture, labeling, and export.
+// WorkTrace prototype: egocentric hand-task capture, labeling, and export.
 // All processing is local to the browser. Hand tracking uses MediaPipe Tasks
 // (loaded from CDN at runtime); the synthetic demo works fully offline.
 
@@ -647,7 +647,7 @@ function buildManifest(truncate) {
   const ep = state.episode;
   const visible = ep.frames.filter(f => f.hands.length > 0).length;
   const manifest = {
-    schema: 'chorecam-episode-v0.1',
+    schema: 'worktrace-episode-v0.1',
     episode_id: 'ep_' + Date.now().toString(36),
     recorded_at: new Date().toISOString(),
     task_vertical: ep.vertical || 'cleaning',
@@ -677,7 +677,7 @@ function downloadEpisode() {
   const blob = new Blob([JSON.stringify(buildManifest(false))], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'chorecam_' + Date.now().toString(36) + '.json';
+  a.download = 'worktrace_' + Date.now().toString(36) + '.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }

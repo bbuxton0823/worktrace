@@ -1,4 +1,4 @@
-/* ChoreCam landing: cinematic scroll experience.
+/* WorkTrace landing: cinematic scroll experience.
    Newest-CSS features are used as progressive enhancement behind @supports:
    scroll-driven animations, @property, text-box trimming, view() timelines. */
 
@@ -113,6 +113,7 @@ body.no-gl #gl { opacity: 0.9; }
   padding: 1.1rem clamp(1.25rem, 4vw, 3rem);
   mix-blend-mode: normal;
 }
+.wordmark .tri { color: var(--mint); }
 .wordmark {
   font-family: var(--font-display);
   font-weight: 800;

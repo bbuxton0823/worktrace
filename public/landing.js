@@ -1,4 +1,4 @@
-// ChoreCam landing: WebGL2 particle stage that morphs between four forms
+// WorkTrace landing: WebGL2 particle stage that morphs between four forms
 // (hand skeleton, data stream, globe, lattice) driven by scroll, plus the
 // page's reveal, counter, cursor, and magnetic-button choreography.
 // WebGL2 is the baseline; everything degrades to a static gradient.

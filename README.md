@@ -35,4 +35,4 @@ Every released episode is a package, not a file: `episode.mp4 + imu.parquet`, `a
 
 ## Naming
 
-The business name in current artifacts is WorkTrace (deck, docs, trace console). The deployed capture prototype and film still say ChoreCam; rebranding them is a pending decision, and the film's closing card and site wordmark are the only places the name is baked in.
+Decided 2026-07-18: the brand is WorkTrace, displayed as the WORKTR▲CE wordmark (solid triangle as the A: the camera's field-of-view cone, and delta for change of state). The typed name stays plain WorkTrace everywhere a human types it. Canonical URL: https://worktrace.buxtonbycha.workers.dev, with the original chorecam worker serving the same site so old links keep working. The film is `public/worktrace-explainer.mp4` (the earlier ChoreCam-branded cuts remain for history).

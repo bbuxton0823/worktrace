@@ -1,5 +1,7 @@
 # WorkTrace
 
+![WorkTrace: title card, cap rig schematic, real POV hand tracking, QA gate, and the WORKTR▲CE closing wordmark](media/worktrace-preview.gif)
+
 Turn authorized physical work into traceable robotics data. This is the master repository, combined on 2026-07-17 from the best parts of three parallel prototype builds of the same idea:
 
 - **chorecam-prototype** (Claude Code build): the browser capture app with live MediaPipe hand tracking, the WebGL landing experience, the narrated explainer film, the sourced business research, and the deployment pipeline. Deployed at https://chorecam.buxtonbycha.workers.dev (the ChoreCam name predates the WorkTrace naming decision; the deployed prototype still carries it).

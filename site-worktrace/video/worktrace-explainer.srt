@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:08,200
+Robots need structured demonstrations of people transforming real spaces.
+
+2
+00:00:08,200 --> 00:00:21,500
+WorkTrace turns authorized physical work into traceable robotics data.
+
+3
+00:00:21,500 --> 00:00:36,700
+Each job begins with site authorization, worker opt-in, audio off, and a safety check.
+
+4
+00:00:36,700 --> 00:00:51,900
+Reviewers verify annotations and exclude sensitive footage before release.
+
+5
+00:00:51,900 --> 00:01:09,600
+The proposed kit connects a brim-mounted UVC camera to an Android phone by USB-C.
+
+6
+00:01:09,600 --> 00:01:21,000
+Adjacent verticals include hospitality, assembly, warehousing, laundry, and maintenance.
+
+7
+00:01:21,000 --> 00:01:42,500
+International expansion matches tasks to markets, with skilled-work pay, a recording premium, local consent, and region-first raw storage.
+
+8
+00:01:42,500 --> 00:01:57,700
+The recommended model pays the staging partner and every participating worker.
+
+9
+00:01:57,700 --> 00:02:15,400
+Sell a buyer-funded specification sprint, then raise only after measured customer value.

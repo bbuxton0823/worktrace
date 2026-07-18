@@ -1,0 +1,126 @@
+{
+  "arms": {
+    "US premium (staging/STR)": {
+      "approved_hours_per_week": 23.8,
+      "cost_per_approved_hour": 31.74,
+      "prices": {
+        "conservative": 50.0,
+        "base": 85.0,
+        "aggressive": 130.0
+      },
+      "gross_margin_base": 0.66
+    },
+    "Philippines (hotels)": {
+      "approved_hours_per_week": 25.5,
+      "cost_per_approved_hour": 11.32,
+      "prices": {
+        "conservative": 15.0,
+        "base": 28.0,
+        "aggressive": 45.0
+      },
+      "gross_margin_base": 0.633
+    },
+    "Colombia (nearshore homes)": {
+      "approved_hours_per_week": 22.1,
+      "cost_per_approved_hour": 12.51,
+      "prices": {
+        "conservative": 18.0,
+        "base": 32.0,
+        "aggressive": 50.0
+      },
+      "gross_margin_base": 0.645
+    }
+  },
+  "years": {
+    "Y1 (pilot)": {
+      "hours": {
+        "US premium (staging/STR)": 1428,
+        "Philippines (hotels)": 2040,
+        "Colombia (nearshore homes)": 0
+      },
+      "revenue": {
+        "conservative": {
+          "revenue": 112200,
+          "gross_profit": 43782,
+          "gross_margin": 0.39,
+          "ebitda": -216218
+        },
+        "base": {
+          "revenue": 196350,
+          "gross_profit": 127932,
+          "gross_margin": 0.652,
+          "ebitda": -132068
+        },
+        "aggressive": {
+          "revenue": 305184,
+          "gross_profit": 236766,
+          "gross_margin": 0.776,
+          "ebitda": -23234
+        }
+      },
+      "cogs": 68418,
+      "total_hours": 3468,
+      "fixed_opex": 260000
+    },
+    "Y2 (scale)": {
+      "hours": {
+        "US premium (staging/STR)": 6569,
+        "Philippines (hotels)": 23460,
+        "Colombia (nearshore homes)": 10166
+      },
+      "revenue": {
+        "conservative": {
+          "revenue": 949661,
+          "gross_profit": 348496,
+          "gross_margin": 0.367,
+          "ebitda": -371504
+        },
+        "base": {
+          "revenue": 1694594,
+          "gross_profit": 1093429,
+          "gross_margin": 0.645,
+          "ebitda": 373429
+        },
+        "aggressive": {
+          "revenue": 2659738,
+          "gross_profit": 2058574,
+          "gross_margin": 0.774,
+          "ebitda": 1338574
+        }
+      },
+      "cogs": 601165,
+      "total_hours": 40195,
+      "fixed_opex": 720000
+    },
+    "Y3 (expand)": {
+      "hours": {
+        "US premium (staging/STR)": 13138,
+        "Philippines (hotels)": 70380,
+        "Colombia (nearshore homes)": 30498
+      },
+      "revenue": {
+        "conservative": {
+          "revenue": 2487698,
+          "gross_profit": 892722,
+          "gross_margin": 0.359,
+          "ebitda": -557278
+        },
+        "base": {
+          "revenue": 4469599,
+          "gross_profit": 2874623,
+          "gross_margin": 0.643,
+          "ebitda": 1424623
+        },
+        "aggressive": {
+          "revenue": 7039877,
+          "gross_profit": 5444900,
+          "gross_margin": 0.773,
+          "ebitda": 3994900
+        }
+      },
+      "cogs": 1594976,
+      "total_hours": 114016,
+      "fixed_opex": 1450000
+    }
+  }
+}

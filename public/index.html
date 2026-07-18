@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChoreCam: robots learn from human hands</title>
+  <meta name="description" content="ChoreCam is a prototype that turns real household work into robot training data: egocentric capture, live hand tracking, labeled episodes." />
+  <meta property="og:title" content="ChoreCam: robots learn from human hands" />
+  <meta property="og:description" content="A prototype that turns real household work into robot training data." />
+  <meta property="og:image" content="https://chorecam.buxtonbycha.workers.dev/poster.jpg" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%96%90%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="landing.css" />
+</head>
+<body>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+  <div id="cursor" aria-hidden="true"><span class="dot"></span><span class="ring"></span></div>
+  <div class="progress" aria-hidden="true"></div>
+
+  <header class="bar">
+    <a class="wordmark" href="/">ChoreCam<span class="chip">prototype</span></a>
+    <a class="btn btn-small" href="app.html">Launch demo</a>
+  </header>
+
+  <main>
+    <section class="chapter hero" data-scene="0">
+      <p class="eyebrow reveal">Prototype concept &middot; July 2026</p>
+      <h1 class="reveal">Robots learn from<br /><em class="grad">human hands.</em></h1>
+      <p class="lede reveal">ChoreCam turns real household work into the training data that teaches machines to fold, wipe, carry, and clean. Captured from a hat brim. Labeled in the flow of work.</p>
+      <div class="cta-row reveal">
+        <a class="btn btn-primary magnetic" href="app.html">Launch the live demo</a>
+        <a class="btn magnetic" href="#film">Watch the film</a>
+      </div>
+      <div class="scroll-cue"><span></span>scroll</div>
+    </section>
+
+    <section class="chapter" data-scene="1">
+      <p class="eyebrow reveal">The market</p>
+      <h2 class="reveal">The bottleneck isn't compute.<br /><em class="grad">It's hands.</em></h2>
+      <p class="lede reveal">Robot foundation models are starved for one input: diverse, labeled demonstrations of skilled hands working in real places. Labs already buy it by the hour.</p>
+      <div class="figures reveal">
+        <div class="figure"><b><span data-count data-to="100" data-prefix="$" data-suffix="M+">$0</span></b><i>spent yearly on real-world robot training data</i></div>
+        <div class="figure"><b><span data-count data-to="20854">0</span></b><i>hours in NVIDIA's largest human-video pretraining corpus</i></div>
+        <div class="figure"><b><span data-count data-to="100" data-prefix="~">0</span></b><i>distinct homes for a cleaning model to generalize</i></div>
+        <div class="figure"><b><span data-count data-to="21">0</span></b><i>landmarks tracked per hand, live in the browser</i></div>
+      </div>
+    </section>
+
+    <section class="chapter" data-scene="1">
+      <p class="eyebrow reveal">The system</p>
+      <h2 class="reveal">Capture in the<br /><em class="grad">flow of work.</em></h2>
+      <div class="steps">
+        <div class="step glass reveal"><span class="num">01</span><h3>Wear</h3><p>A small camera in a hat brim points at the hands. The worker just works.</p></div>
+        <div class="step glass reveal"><span class="num">02</span><h3>Track</h3><p>21 landmarks per hand, tracked live, with a hands-visible meter that catches bad framing before it costs an hour.</p></div>
+        <div class="step glass reveal"><span class="num">03</span><h3>Label</h3><p>Task chips segment the episode as it happens. Quality is scored before anyone leaves the site.</p></div>
+      </div>
+      <p class="aside reveal"><a href="app.html">The tracker runs in your browser. Try it live &rarr;</a></p>
+    </section>
+
+    <section class="chapter" data-scene="2">
+      <p class="eyebrow reveal">The wedge</p>
+      <h2 class="reveal">Start where<br /><em class="grad">consent is clean.</em></h2>
+      <div class="verticals">
+        <div class="vertical glass reveal"><h3>Home staging</h3><p>Vacant houses. Furniture carries, assembly, styling. A crew of two produces synchronized multi-view episodes of every task.</p></div>
+        <div class="vertical glass reveal"><h3>Rental turnover</h3><p>Empty short-term rentals on a schedule. The same tasks, hundreds of times, across hundreds of rooms.</p></div>
+        <div class="vertical glass reveal"><h3>Hotel floors</h3><p>Standardized rooms worldwide. A floor in Manila trains the same robot as a floor in Chicago.</p></div>
+      </div>
+      <p class="aside reveal">Offshore arms researched and ranked: the Philippines first, Colombia second. Occupied homes come last, once the privacy pipeline has earned it.</p>
+    </section>
+
+    <section class="chapter" data-scene="3">
+      <p class="eyebrow reveal">The product</p>
+      <h2 class="reveal">Annotations and rights.<br /><em class="grad">Not raw footage.</em></h2>
+      <ul class="manifest">
+        <li class="reveal">World-frame camera pose from the rig's own telemetry</li>
+        <li class="reveal">3D hand pose with per-joint confidence</li>
+        <li class="reveal">Language-labeled task segments</li>
+        <li class="reveal">A signed consent record inside every episode manifest</li>
+        <li class="reveal">Delivered in the formats labs actually train on</li>
+      </ul>
+      <p class="kicker reveal">Raw video is nearly free. <em class="grad">Provenance is not.</em></p>
+    </section>
+
+    <section class="chapter" data-scene="3" id="film">
+      <p class="eyebrow reveal">The film</p>
+      <h2 class="reveal">Sixty seconds,<br /><em class="grad">start to finish.</em></h2>
+      <div class="film-frame glass reveal">
+        <video controls preload="metadata" poster="poster.jpg" src="chorecam-explainer.mp4"></video>
+      </div>
+    </section>
+
+    <section class="chapter finale" data-scene="0">
+      <h2 class="reveal">See it<br /><em class="grad">working.</em></h2>
+      <p class="lede reveal">The capture app, the hardware spec, and the business research are all real. Plug in a webcam and watch your own hands become data.</p>
+      <div class="cta-row reveal">
+        <a class="btn btn-primary btn-big magnetic" href="app.html">Launch the demo</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    ChoreCam is a prototype concept. Built with hands, July 2026.
+  </footer>
+
+  <script type="module" src="landing.js"></script>
+</body>
+</html>

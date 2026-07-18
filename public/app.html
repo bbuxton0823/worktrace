@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChoreCam (prototype)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v3M12 3l-4 2M12 3l4 2" />
+          <circle cx="12" cy="13" r="6" />
+          <circle cx="12" cy="13" r="2.2" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">ChoreCam</span>
+        <span class="badge">prototype</span>
+      </div>
+      <span class="tagline">Egocentric hand-task capture for robot training data (demo)</span>
+    </div>
+    <div id="trackerStatus" class="status-pill status-idle" role="status">Idle</div>
+  </header>
+
+  <main class="layout">
+    <section class="col-main">
+      <div class="card viewport-card">
+        <div class="viewport-wrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="canvas" width="960" height="540" aria-label="Capture viewport with hand tracking overlay"></canvas>
+          <div id="recBadge" class="rec-badge hidden"><span class="rec-dot"></span>REC <span id="recTime">00:00</span></div>
+        </div>
+        <div class="viewport-controls">
+          <div class="source-group" role="group" aria-label="Video source">
+            <button id="btnWebcam" class="btn" title="Requires consent checks">Webcam</button>
+            <select id="cameraSel" class="select hidden" aria-label="Camera"></select>
+            <button id="btnFlip" class="btn hidden" title="For upside-down brim mounts">Rotate 180&deg;</button>
+            <button id="btnUpload" class="btn" title="Requires consent checks">Upload video</button>
+            <input id="fileInput" type="file" accept="video/*" class="hidden" />
+            <button id="btnDemo" class="btn btn-accent">Generate synthetic demo</button>
+          </div>
+          <div class="record-group">
+            <button id="btnRecord" class="btn btn-record" disabled>&#9679; Record</button>
+            <button id="btnStop" class="btn" disabled>&#9632; Stop</button>
+          </div>
+        </div>
+        <p id="viewportHint" class="hint">Choose a source. The synthetic demo needs no camera: it generates a labeled episode of fake hand motion so you can see the full pipeline.</p>
+      </div>
+
+      <div class="card timeline-card">
+        <div class="card-title-row">
+          <h2>Episode timeline</h2>
+          <div class="playback-group">
+            <button id="btnPlay" class="btn btn-small" disabled>&#9654; Play</button>
+            <select id="speedSel" class="select" aria-label="Playback speed">
+              <option value="1">1x</option>
+              <option value="2" selected>2x</option>
+              <option value="4">4x</option>
+            </select>
+          </div>
+        </div>
+        <div id="timeline" class="timeline" aria-label="Labeled segments">
+          <div id="playhead" class="playhead hidden"></div>
+        </div>
+        <input id="scrubber" type="range" min="0" max="0" value="0" step="1" class="scrubber" disabled aria-label="Scrub through episode frames" />
+        <div class="timeline-meta"><span id="timeCursor">00:00.0</span><span id="timeTotal">00:00.0</span></div>
+      </div>
+
+      <div class="card export-card">
+        <div class="card-title-row">
+          <h2>Export episode</h2>
+          <div>
+            <button id="btnCopy" class="btn btn-small" disabled>Copy JSON</button>
+            <button id="btnDownload" class="btn btn-small btn-accent" disabled>Download episode</button>
+          </div>
+        </div>
+        <pre id="exportPreview" class="export-preview">No episode yet. Record or generate a demo, then the manifest preview appears here.</pre>
+      </div>
+    </section>
+
+    <aside class="col-side">
+      <div class="card consent-card">
+        <h2>Consent gate</h2>
+        <label class="check-row"><input type="checkbox" id="consentWorker" /> <span>Worker consented to hands-focused recording</span></label>
+        <label class="check-row"><input type="checkbox" id="consentHome" /> <span>Household consent form signed, bystanders excluded</span></label>
+        <p class="hint">Real recording unlocks only after both checks. The synthetic demo skips the gate because no humans are recorded.</p>
+      </div>
+
+      <div class="card tasks-card">
+        <div class="card-title-row">
+          <h2>Task label</h2>
+          <select id="verticalSel" class="select" aria-label="Capture vertical">
+            <option value="cleaning">House cleaning</option>
+            <option value="staging">Home staging</option>
+          </select>
+        </div>
+        <p class="hint">Pick the capture vertical, then tap the task being performed while recording. Switching tasks closes the previous segment.</p>
+        <div id="taskChips" class="chip-grid" role="group" aria-label="Task labels"></div>
+      </div>
+
+      <div class="card stats-card">
+        <h2>Episode stats</h2>
+        <dl id="statsList" class="stats-list">
+          <div class="stat-row"><dt>Duration</dt><dd id="statDuration">&ndash;</dd></div>
+          <div class="stat-row"><dt>Frames</dt><dd id="statFrames">&ndash;</dd></div>
+          <div class="stat-row"><dt>Hands visible</dt><dd id="statVisible">&ndash;</dd></div>
+          <div class="stat-row"><dt>Segments</dt><dd id="statSegments">&ndash;</dd></div>
+        </dl>
+        <div id="taskBreakdown" class="task-breakdown"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    ChoreCam is a prototype demo. All processing runs locally in your browser; nothing is uploaded anywhere.
+    <a href="/" style="color: var(--accent);">Project overview</a> &middot;
+    <a href="chorecam-explainer.mp4" style="color: var(--accent);">Watch the 60-second explainer</a>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

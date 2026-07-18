@@ -1,0 +1,17 @@
+Robots need more than internet video. They need structured demonstrations of people transforming real spaces.
+
+WorkTrace is a working prototype for turning authorized physical work into traceable robotics data. The first program focuses on professional staging in vacant homes, where crews unload, carry, assemble, place, correct, and later destage.
+
+Every job begins with site authorization, worker opt-in, audio off, and a safety check. The capture console combines a first-person view with a static room view, task markers, and a worker-controlled privacy pause.
+
+Reviewers verify suggested hand, object, and state-change labels. Sensitive footage, such as an address label, is excluded before the episode can be approved and packaged for a buyer.
+
+The proposed field kit uses a lightweight UVC brim camera connected by USB-C to an Android phone, plus a static room camera. This mobile flow is simulated here. Native external-camera recording still needs hardware and device testing.
+
+WorkTrace also compares adjacent verticals, including hospitality turnover, furniture assembly, warehouse kitting, retail replenishment, laundry, detailing, and maintenance.
+
+International expansion is matched to tasks, not low wages. Mexico is the first nearshore candidate for staging. India is the first Asia capture candidate. The Philippines fits annotation and quality review unless its body-camera retention rules are resolved. Vietnam fits industrial and furniture work. Colombia fits nearshore hospitality. Every country requires normal skilled-work pay plus a recording premium, local-language consent, a regional raw vault, and local counsel.
+
+The recommended operating model is a paid staging partner with a separate worker stipend. The customer keeps paying the normal service bill, while the data program pays for participation, setup, and administration.
+
+Sell a buyer-funded specification sprint first. Raise larger venture capital only after a robotics customer measures model value, accepted-hour economics are known, and repeat demand is visible.

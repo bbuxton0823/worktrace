@@ -187,7 +187,7 @@ export default function Home() {
       <header className="site-header">
         <a className="brand" href="#top" aria-label="WorkTrace home">
           <span className="brand-mark"><i /><i /><i /></span>
-          <span>WORKTRACE</span>
+          <span>WORKTR<span style={{color:"#c9f36a"}}>▲</span>CE</span>
           <small>PROTO/01</small>
         </a>
         <nav aria-label="Experience chapters">
@@ -202,7 +202,7 @@ export default function Home() {
         <div className="hero-copy">
           <div className="eyebrow-row">
             <span className="status-pill"><i /> WORKING PROTOTYPE</span>
-            <span>PHYSICAL INTELLIGENCE / 2026</span>
+            <span>PHYSICAL WORK DATA / 2026</span>
           </div>
           <p className="hero-kicker">THE WORLD IS ALREADY TEACHING ROBOTS.</p>
           <h1>Turn physical work into <em>traceable</em> robotics data.</h1>
@@ -501,7 +501,7 @@ export default function Home() {
 
       <section className="closing shell">
         <div className="closing-mark" aria-hidden="true"><i /><i /><i /><span>W</span></div>
-        <p className="overline">A PROTOTYPE FOR PHYSICAL INTELLIGENCE</p>
+        <p className="overline">A PHYSICAL WORK DATA PROTOTYPE</p>
         <h2>Start with one task.<br />Prove one trace.</h2>
         <p>Build the smallest authorized episode that a robotics buyer can evaluate, then let evidence decide where the network goes next.</p>
         <div className="role-paths">
@@ -512,7 +512,7 @@ export default function Home() {
         <button className="button primary closing-button" onClick={openExplainer}>Watch the prototype explainer <span>▶</span></button>
       </section>
 
-      <footer className="site-footer shell"><a className="brand" href="#top"><span className="brand-mark"><i /><i /><i /></span><span>WORKTRACE</span></a><p>Physical work → authorized trace → evaluated robotics data</p><span>PROTOTYPE / JULY 2026</span></footer>
+      <footer className="site-footer shell"><a className="brand" href="#top"><span className="brand-mark"><i /><i /><i /></span><span>WORKTR<span style={{color:"#c9f36a"}}>▲</span>CE</span></a><p>Physical work → authorized trace → evaluated robotics data</p><span>PROTOTYPE / JULY 2026</span></footer>
 
       {showExplainer && (
         <div className="video-modal" role="dialog" aria-modal="true" aria-labelledby="video-title" onMouseDown={(event) => { if (event.target === event.currentTarget) closeExplainer(); }}>

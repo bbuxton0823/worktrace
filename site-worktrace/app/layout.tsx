@@ -20,20 +20,20 @@ export async function generateMetadata(): Promise<Metadata> {
   const imageUrl = `${protocol}://${host}/og.png`;
 
   return {
-    title: "WorkTrace | Physical Intelligence Prototype",
+    title: "WorkTrace | Physical Work Data Prototype",
     description:
       "A cinematic prototype for turning authorized physical work into traceable, rights-aware, evaluated robotics data.",
     applicationName: "WorkTrace Prototype",
     openGraph: {
-      title: "WorkTrace | Physical Intelligence Prototype",
+      title: "WorkTrace | Physical Work Data Prototype",
       description:
         "The world is already teaching robots. Turn authorized physical work into a traceable data product.",
       type: "website",
-      images: [{ url: imageUrl, width: 1730, height: 909, alt: "WorkTrace physical intelligence prototype" }],
+      images: [{ url: imageUrl, width: 1730, height: 909, alt: "WorkTrace physical work data prototype" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "WorkTrace | Physical Intelligence Prototype",
+      title: "WorkTrace | Physical Work Data Prototype",
       description: "From authorized physical work to traceable robotics data.",
       images: [imageUrl],
     },

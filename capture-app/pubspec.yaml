@@ -10,8 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   camera: ^0.10.5
-  usb_camera: ^0.3.0        # USB-C UVC external camera plugin
-  permission_handler: ^11.0
+  # NOTE: `usb_camera` (external UVC hat camera) does not exist on pub.dev —
+  # dropped. Re-add a maintained UVC plugin when the Gen 2 rig lands.
+  permission_handler: ^11.0.0
   path_provider: ^2.1.0
   video_player: ^2.8.0
   http: ^1.1.0

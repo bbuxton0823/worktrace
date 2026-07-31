@@ -75,7 +75,7 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Data Hat'), centerTitle: true),
+      appBar: AppBar(title: const Text('Worktrace'), centerTitle: true),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: ListView(

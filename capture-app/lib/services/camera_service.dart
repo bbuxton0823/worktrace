@@ -1,65 +1,130 @@
-/// Built-in camera service — wraps the camera plugin.
-/// Provides a CameraController for the preview widget and handles
-/// recording to local storage.
-///
-/// Note: the external UVC hat-camera path (Gen 2 rig per HARDWARE.md) is not
-/// wired up yet — the previously referenced `usb_camera` package does not
-/// exist on pub.dev. Built-in phone camera only for now; UVC support needs a
-/// maintained plugin (e.g. uvccamera) or a native Android USB host layer.
 import 'dart:async';
+
 import 'package:camera/camera.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class CameraService {
-  CameraController? _controller;
-  Timer? _fpsTimer;
-  int _frameCount = 0;
-  int _handFrames = 0;
+abstract class CaptureCamera {
+  CameraController? get controller;
+  bool get isInitialized;
+  bool get isUsbCamera;
 
-  bool get isInitialized => _controller?.value.isInitialized ?? false;
-  double get handCoverage =>
-      _frameCount > 0 ? _handFrames / _frameCount : 0.0;
+  Future<bool> initialize();
+  Future<void> startRecording();
+  Future<XFile?> stopRecording();
+  Future<void> dispose();
+}
 
-  /// No external UVC camera support yet — always the built-in camera.
-  bool get isUsbCamera => false;
+class RecordingStopper {
+  RecordingStopper(this._camera);
 
-  Future<CameraController?> initialize() async {
-    await Permission.camera.request();
-    await Permission.microphone.request();
+  final CaptureCamera _camera;
+  Future<XFile?>? _stopFuture;
+  XFile? _stoppedFile;
 
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) return null;
-    _controller = CameraController(
-      // Prefer front-facing on phones for hat-cam; back otherwise
-      cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front,
-          orElse: () => cameras.first),
-      ResolutionPreset.high,
-      enableAudio: true,
-    );
-    await _controller!.initialize();
-    return _controller;
-  }
+  Future<XFile?> stop() async {
+    if (_stoppedFile != null) return _stoppedFile;
+    final pending = _stopFuture;
+    if (pending != null) return pending;
 
-  Future<String> startRecording() async {
-    await _controller?.startVideoRecording();
-    _fpsTimer = Timer.periodic(const Duration(seconds: 1), (_) {});
-    // Actual file path is returned by stopVideoRecording (XFile); this
-    // placeholder keeps the caller API stable.
-    return '';
-  }
-
-  Future<void> stopRecording() async {
-    _fpsTimer?.cancel();
-    await _controller?.stopVideoRecording();
-  }
-
-  void recordHandFrame(bool handsDetected) {
-    _frameCount++;
-    if (handsDetected) _handFrames++;
-  }
-
-  void dispose() {
-    _fpsTimer?.cancel();
-    _controller?.dispose();
+    final request = _camera.stopRecording();
+    _stopFuture = request;
+    try {
+      final file = await request;
+      if (file != null) _stoppedFile = file;
+      return file;
+    } finally {
+      if (_stoppedFile == null) _stopFuture = null;
+    }
   }
 }
+
+class CameraService implements CaptureCamera {
+  CameraController? _controller;
+
+  @override
+  CameraController? get controller => _controller;
+
+  @override
+  bool get isInitialized => _controller?.value.isInitialized ?? false;
+
+  @override
+  bool get isUsbCamera =>
+      _controller?.description.lensDirection == CameraLensDirection.external;
+
+  @override
+  Future<bool> initialize() async {
+    if (isInitialized) return true;
+
+    final permission = await Permission.camera.request();
+    if (!permission.isGranted) {
+      throw CameraException(
+        'CameraAccessDenied',
+        'Camera permission is required to record an episode.',
+      );
+    }
+
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) return false;
+
+    final selected = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => cameras.first,
+    );
+    final previous = _controller;
+    _controller = null;
+    await previous?.dispose();
+
+    final nextController = CameraController(
+      selected,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+    try {
+      await nextController.initialize();
+      _controller = nextController;
+      return true;
+    } catch (_) {
+      await nextController.dispose();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> startRecording() async {
+    final active = _controller;
+    if (active == null || !active.value.isInitialized) {
+      throw CameraException(
+        'Uninitialized CameraController',
+        'The camera must be ready before recording starts.',
+      );
+    }
+    if (!active.value.isRecordingVideo) {
+      await active.startVideoRecording();
+    }
+  }
+
+  @override
+  Future<XFile?> stopRecording() async {
+    final active = _controller;
+    if (active == null ||
+        !active.value.isInitialized ||
+        !active.value.isRecordingVideo) {
+      return null;
+    }
+    return active.stopVideoRecording();
+  }
+
+  @override
+  Future<void> dispose() async {
+    final active = _controller;
+    _controller = null;
+    await active?.dispose();
+  }
+}
+
+final cameraServiceProvider = Provider<CaptureCamera>((ref) {
+  final camera = CameraService();
+  ref.onDispose(() => unawaited(camera.dispose()));
+  return camera;
+});

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import boto3
 from botocore.config import Config as BotoConfig
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -88,8 +88,8 @@ def upload_url(body: UploadUrlRequest,
 
 @app.post("/ingest/direct")
 async def direct_upload(file: UploadFile = File(...),
-                        worker_id: str = "",
-                        job_type: str = "",
+                        worker_id: str = Form(default=""),
+                        job_type: str = Form(default=""),
                         authorization: str | None = Header(default=None)):
     """Direct multipart upload for MVP when S3 presigned is overkill."""
     _verify_key(authorization)
@@ -118,6 +118,7 @@ def confirm(body: ConfirmRequest,
             "worker_id": body.worker_id,
             "duration_s": body.duration_s,
             "hand_coverage_est": body.hand_coverage_est,
+            "task_label_count": body.task_label_count,
             "status": "queued", "created_at": time.time(),
         }) + "\n")
     return ConfirmResponse(episode_id=episode_id, status="queued")

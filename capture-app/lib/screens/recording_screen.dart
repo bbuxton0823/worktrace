@@ -1,10 +1,12 @@
-/// Screen 2: Active Recording — camera preview, hand tracking overlay,
-/// task-label chips (visual-only — no audio, no narration).
 import 'dart:async';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/session_provider.dart';
+
 import '../services/camera_service.dart';
+import '../services/episode_store.dart';
+import '../services/session_provider.dart';
 
 class RecordingScreen extends ConsumerStatefulWidget {
   const RecordingScreen({super.key});
@@ -15,112 +17,144 @@ class RecordingScreen extends ConsumerStatefulWidget {
 
 class _RecordingScreenState extends ConsumerState<RecordingScreen>
     with WidgetsBindingObserver {
-  final _cameraService = CameraService();
+  late final CaptureCamera _camera;
+  late final EpisodeWriter _episodeStore;
+  late final RecordingStopper _recordingStopper;
   Timer? _timer;
-  String _activeTask = '';
-  final List<Map<String, dynamic>> _taskLog = [];
+  bool _initializing = true;
+  bool _ending = false;
+  bool _interrupted = false;
+  String? _cameraError;
 
   static const _taskChips = [
-    'wipe plate', 'wipe counter', 'wash dish', 'rinse dish',
-    'fold towel', 'fold laundry', 'sweep floor', 'mop floor',
-    'assemble item', 'arrange decor', 'hang item', 'unpack box',
-    'place item', 'load rack', 'scrub surface',
+    'wipe plate',
+    'wipe counter',
+    'wash dish',
+    'rinse dish',
+    'fold towel',
+    'fold laundry',
+    'sweep floor',
+    'mop floor',
+    'assemble item',
+    'arrange decor',
+    'hang item',
+    'unpack box',
+    'place item',
+    'load rack',
+    'scrub surface',
   ];
 
   @override
   void initState() {
     super.initState();
+    _camera = ref.read(cameraServiceProvider);
+    _episodeStore = ref.read(episodeStoreProvider);
+    _recordingStopper = RecordingStopper(_camera);
     WidgetsBinding.instance.addObserver(this);
-    _initCamera();
-    _startTimer();
+    unawaited(_startCapture());
   }
 
-  Future<void> _initCamera() async {
-    final ctrl = await _cameraService.initialize();
-    if (ctrl != null) setState(() {});
-    await _cameraService.startRecording();
+  Future<void> _startCapture() async {
+    try {
+      final ready = _camera.isInitialized || await _camera.initialize();
+      if (!ready) throw StateError('No camera is available.');
+      await _camera.startRecording();
+      if (!mounted) return;
+      setState(() => _initializing = false);
+      _startTimer();
+    } catch (_) {
+      if (!mounted) return;
+      ref
+          .read(sessionProvider.notifier)
+          .failCapture('Camera recording could not start.');
+      setState(() {
+        _initializing = false;
+        _cameraError = 'Camera recording could not start. Reconnect and retry.';
+      });
+    }
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       final session = ref.read(sessionProvider);
       if (session.isRecording) {
-        ref.read(sessionProvider.notifier)
+        ref
+            .read(sessionProvider.notifier)
             .tick(session.elapsed + const Duration(seconds: 1));
-        _cameraService.recordHandFrame(true);
-        ref.read(sessionProvider.notifier)
-            .updateHandCoverage(_cameraService.handCoverage);
       }
     });
   }
 
   void _setTask(String task) {
-    final now = ref.read(sessionProvider).elapsed;
-    setState(() {
-      if (_activeTask.isNotEmpty) {
-        _taskLog.last['end'] = now.inMilliseconds / 1000.0;
-      }
-      _activeTask = task;
-      _taskLog.add({
-        'start': now.inMilliseconds / 1000.0,
-        'end': now.inMilliseconds / 1000.0 + 5.0,
-        'task': task,
-        'source': 'chip_tap',
-      });
-    });
+    ref.read(sessionProvider.notifier).setTask(task);
   }
 
-  void _privacyDelete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete last 5 minutes?'),
-        content: const Text('Permanently removes the last 5 minutes of video.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Last 5 minutes deleted'),
-                    backgroundColor: Colors.red),
-              );
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+  Future<XFile?> _stopCameraOnce() async {
+    return _recordingStopper.stop();
+  }
+
+  Future<void> _handleInterruption() async {
+    _timer?.cancel();
+    try {
+      await _stopCameraOnce();
+      if (!mounted) return;
+      setState(() => _interrupted = true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cameraError = 'Recording was interrupted. End the shift to save it.';
+      });
+    }
   }
 
   Future<void> _endShift() async {
+    if (_ending) return;
+    setState(() => _ending = true);
     _timer?.cancel();
-    await _cameraService.stopRecording();
-    // Close any open task interval
-    if (_activeTask.isNotEmpty && _taskLog.isNotEmpty) {
-      _taskLog.last['end'] =
-          ref.read(sessionProvider).elapsed.inMilliseconds / 1000.0;
+
+    try {
+      final recorded = await _stopCameraOnce();
+      if (recorded == null) {
+        throw StateError('No completed video file was returned by the camera.');
+      }
+
+      final notifier = ref.read(sessionProvider.notifier);
+      notifier.stop();
+      final artifact = await _episodeStore.save(
+        recorded,
+        ref.read(sessionProvider),
+      );
+      notifier.attachArtifact(
+        videoPath: artifact.videoPath,
+        metadataPath: artifact.metadataPath,
+      );
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/shift-end');
+    } catch (_) {
+      ref
+          .read(sessionProvider.notifier)
+          .failCapture('The episode could not be saved.');
+      if (!mounted) return;
+      setState(() {
+        _ending = false;
+        _cameraError =
+            'The episode could not be saved. The upload step is disabled.';
+      });
     }
-    // Save task log alongside video for pipeline ingestion
-    ref.read(sessionProvider.notifier).stop();
-    Navigator.pushReplacementNamed(context, '/shift-end');
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _cameraService.stopRecording();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      unawaited(_handleInterruption());
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _cameraService.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -128,99 +162,147 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-    final elapsed = session.elapsed;
+    final activeTask =
+        session.taskMarkers.isNotEmpty && session.taskMarkers.last.endS == null
+            ? session.taskMarkers.last.task
+            : '';
 
     return Scaffold(
       body: Stack(
         children: [
-          const Center(
-              child: Text('[camera preview]',
-                  style: TextStyle(color: Colors.white38))),
-          // Top HUD
+          Positioned.fill(child: _cameraView()),
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: Container(
               color: Colors.black87,
               padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top,
-                  left: 16, right: 16, bottom: 8),
+                top: MediaQuery.of(context).padding.top,
+                left: 16,
+                right: 16,
+                bottom: 8,
+              ),
               child: Row(
                 children: [
-                  const Icon(Icons.fiber_manual_record,
-                      color: Colors.red, size: 14),
+                  Icon(
+                    Icons.fiber_manual_record,
+                    color: _interrupted ? Colors.orange : Colors.red,
+                    size: 14,
+                  ),
                   const SizedBox(width: 6),
-                  Text(_fmt(elapsed),
+                  Text(_fmt(session.elapsed),
                       style: const TextStyle(fontSize: 18)),
                   const Spacer(),
-                  Text('${(session.handCoverage ?? 0 * 100).toStringAsFixed(0)}% hands',
-                      style: const TextStyle(fontSize: 14)),
+                  Text(
+                    session.handCoverage == null
+                        ? 'hands not measured'
+                        : '${(session.handCoverage! * 100).toStringAsFixed(0)}% hands',
+                    style: const TextStyle(fontSize: 14),
+                  ),
                   const SizedBox(width: 12),
-                  Text('${_taskLog.length} labels',
+                  Text('${session.taskMarkers.length} labels',
                       style: const TextStyle(fontSize: 14)),
                 ],
               ),
             ),
           ),
-          // Active task label
-          if (_activeTask.isNotEmpty)
+          if (_cameraError != null || _interrupted)
             Positioned(
-              bottom: 120, left: 16,
+              top: MediaQuery.of(context).padding.top + 58,
+              left: 16,
+              right: 16,
+              child: Material(
+                color: Colors.orange.shade900,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _cameraError ??
+                        'Recording was interrupted. End the shift to save it.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          if (activeTask.isNotEmpty)
+            Positioned(
+              bottom: 150,
+              left: 16,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(8)),
-                child: Text('task: $_activeTask',
+                  color: Colors.green.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('task: $activeTask',
                     style: const TextStyle(fontSize: 18)),
               ),
             ),
-          // Bottom controls
           Positioned(
-            bottom: 0, left: 0, right: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
             child: Container(
               color: Colors.black87,
               padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).padding.bottom,
-                  top: 8, left: 12, right: 12),
+                bottom: MediaQuery.of(context).padding.bottom,
+                top: 8,
+                left: 12,
+                right: 12,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Task chips (two rows for density)
                   Wrap(
-                    spacing: 6, runSpacing: 6,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: _taskChips
-                        .map((t) => ChoiceChip(
-                              label: Text(t, style: const TextStyle(fontSize: 12)),
-                              selected: _activeTask == t,
-                              selectedColor: Colors.green,
-                              onSelected: (_) => _setTask(t),
-                              visualDensity: VisualDensity.compact,
-                            ))
+                        .map(
+                          (task) => ChoiceChip(
+                            label: Text(task,
+                                style: const TextStyle(fontSize: 12)),
+                            selected: activeTask == task,
+                            selectedColor: Colors.green,
+                            onSelected: _initializing || _interrupted
+                                ? null
+                                : (_) => _setTask(task),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 8),
-                  // Action buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.delete_forever,
-                            color: Colors.redAccent),
-                        onPressed: _privacyDelete,
-                        tooltip: 'Delete last 5 min',
+                      const IconButton(
+                        icon: Icon(Icons.delete_forever, color: Colors.grey),
+                        onPressed: null,
+                        tooltip: 'Delete unavailable in this prototype',
+                      ),
+                      const IconButton(
+                        icon: Icon(Icons.pause_circle,
+                            size: 48, color: Colors.grey),
+                        onPressed: null,
+                        tooltip: 'Pause unavailable in this prototype',
                       ),
                       IconButton(
-                        icon: const Icon(Icons.pause_circle,
-                            size: 48, color: Colors.orange),
-                        onPressed: () {},
-                        tooltip: 'Pause',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.stop_circle,
-                            size: 48, color: Colors.red),
-                        onPressed: _endShift,
+                        icon: _ending
+                            ? const SizedBox(
+                                width: 36,
+                                height: 36,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 3),
+                              )
+                            : const Icon(Icons.stop_circle,
+                                size: 48, color: Colors.red),
+                        onPressed:
+                            _initializing || _cameraError != null || _ending
+                                ? null
+                                : _endShift,
                         tooltip: 'End shift',
                       ),
                     ],
@@ -234,10 +316,28 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
     );
   }
 
-  String _fmt(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
+  Widget _cameraView() {
+    final controller = _camera.controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return Center(
+        child: Text(
+          _initializing ? 'Starting camera...' : 'Camera unavailable',
+          style: const TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+    return Center(
+      child: AspectRatio(
+        aspectRatio: controller.value.aspectRatio,
+        child: CameraPreview(controller),
+      ),
+    );
+  }
+
+  String _fmt(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
 }

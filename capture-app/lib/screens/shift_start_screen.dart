@@ -1,4 +1,4 @@
-/// Screen 1: Shift Start — worker ID, job type picker, calibration.
+// Screen 1: Shift Start, worker ID, job type picker, and camera readiness.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/session_provider.dart';
@@ -15,8 +15,8 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
   final _workerCtrl = TextEditingController();
   final _homeCtrl = TextEditingController();
   String _jobType = 'kitchen_clean';
-  final _cameraService = CameraService();
   bool _calibrating = false;
+  bool _cameraReady = false;
   String _calibStatus = '';
 
   static const _jobTypes = [
@@ -33,7 +33,6 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
   void dispose() {
     _workerCtrl.dispose();
     _homeCtrl.dispose();
-    _cameraService.dispose();
     super.dispose();
   }
 
@@ -42,28 +41,53 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
       _calibrating = true;
       _calibStatus = 'connecting to camera...';
     });
-    final ctrl = await _cameraService.initialize();
-    if (ctrl == null && !_cameraService.isUsbCamera) {
+    final camera = ref.read(cameraServiceProvider);
+    try {
+      final ready = await camera.initialize();
+      if (!mounted) return;
+      if (!ready) {
+        setState(() {
+          _cameraReady = false;
+          _calibStatus = 'no camera found';
+          _calibrating = false;
+        });
+        return;
+      }
       setState(() {
-        _calibStatus = 'no camera found';
+        _calibStatus = 'camera ready, hold hands at working distance';
+      });
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      setState(() {
+        _cameraReady = true;
+        _calibStatus = camera.isUsbCamera
+            ? 'USB-C camera ready ✓'
+            : 'built-in camera ready ✓ (USB-C camera not detected)';
         _calibrating = false;
       });
-      return;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cameraReady = false;
+        _calibStatus = 'camera unavailable, check permission and reconnect';
+        _calibrating = false;
+      });
     }
-    setState(() => _calibStatus = 'camera ready — hold hands at working distance');
-    // In a full build, we'd run MediaPipe here and show live skeleton.
-    // For now, we simulate a 2-second calibration.
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _calibStatus = _cameraService.isUsbCamera
-          ? 'USB-C camera calibrated ✓'
-          : 'built-in camera ready ✓ (USB-C camera not detected)';
-      _calibrating = false;
-    });
   }
 
   void _startShift() {
-    if (_workerCtrl.text.trim().isEmpty) return;
+    if (!_cameraReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Calibrate the camera before recording.')),
+      );
+      return;
+    }
+    if (_workerCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a worker ID.')),
+      );
+      return;
+    }
     ref.read(sessionProvider.notifier).start(
           _workerCtrl.text.trim(),
           _jobType,
@@ -98,17 +122,16 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _jobType,
+              initialValue: _jobType,
               decoration: const InputDecoration(
                   labelText: 'Job Type', prefixIcon: Icon(Icons.work)),
               items: _jobTypes
-                  .map((j) =>
-                      DropdownMenuItem(value: j, child: Text(j.replaceAll('_', ' '))))
+                  .map((j) => DropdownMenuItem(
+                      value: j, child: Text(j.replaceAll('_', ' '))))
                   .toList(),
               onChanged: (v) => setState(() => _jobType = v!),
             ),
             const SizedBox(height: 24),
-            // Calibration
             OutlinedButton.icon(
               onPressed: _calibrating ? null : _calibrate,
               icon: const Icon(Icons.cameraswitch),
@@ -125,7 +148,7 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
               ),
             const SizedBox(height: 32),
             FilledButton.icon(
-              onPressed: _startShift,
+              onPressed: _cameraReady ? _startShift : null,
               icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
               label: const Text('Start Recording'),
               style: FilledButton.styleFrom(

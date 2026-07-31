@@ -1,6 +1,7 @@
 """Tests for EgoData ingest API (visual-only pipeline)."""
 import io
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,6 +25,7 @@ def test_direct_upload(tmp_path, monkeypatch):
     assert r.status_code == 200
     assert r.json()["status"] == "stored"
     assert r.json()["size"] == len(data)
+    assert Path(r.json()["key"]).parent.name == "w01"
 
 
 def test_upload_url(monkeypatch):
@@ -48,6 +50,7 @@ def test_confirm(tmp_path, monkeypatch):
     manifest = tmp_path / "manifest.jsonl"
     entry = json.loads(manifest.read_text().strip())
     assert entry["worker_id"] == "w01"
+    assert entry["task_label_count"] == 12
 
 
 def test_auth_rejected(monkeypatch):

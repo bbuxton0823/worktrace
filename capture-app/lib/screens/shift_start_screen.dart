@@ -1,4 +1,6 @@
-// Screen 1: Shift Start, worker ID, job type picker, and camera readiness.
+import 'dart:async';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/session_provider.dart';
@@ -18,6 +20,8 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
   bool _calibrating = false;
   bool _cameraReady = false;
   String _calibStatus = '';
+  Timer? _cameraPoller;
+  bool _refreshingCameras = false;
 
   static const _jobTypes = [
     'kitchen_clean',
@@ -31,6 +35,7 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
 
   @override
   void dispose() {
+    _cameraPoller?.cancel();
     _workerCtrl.dispose();
     _homeCtrl.dispose();
     super.dispose();
@@ -43,7 +48,7 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
     });
     final camera = ref.read(cameraServiceProvider);
     try {
-      final ready = await camera.initialize();
+      final ready = await camera.initialize(refresh: true);
       if (!mounted) return;
       if (!ready) {
         setState(() {
@@ -54,17 +59,11 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
         return;
       }
       setState(() {
-        _calibStatus = 'camera ready, hold hands at working distance';
-      });
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      setState(() {
         _cameraReady = true;
-        _calibStatus = camera.isUsbCamera
-            ? 'USB-C camera ready ✓'
-            : 'built-in camera ready ✓ (USB-C camera not detected)';
+        _calibStatus = '${camera.cameraLabel} ready ✓';
         _calibrating = false;
       });
+      _startCameraPolling();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -72,6 +71,38 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
         _calibStatus = 'camera unavailable, check permission and reconnect';
         _calibrating = false;
       });
+    }
+  }
+
+  void _startCameraPolling() {
+    _cameraPoller?.cancel();
+    _cameraPoller = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => unawaited(_refreshCameraList()),
+    );
+  }
+
+  Future<void> _refreshCameraList() async {
+    if (_refreshingCameras || _calibrating) return;
+    _refreshingCameras = true;
+    final camera = ref.read(cameraServiceProvider);
+    try {
+      final changed = await camera.refreshIfCameraListChanged();
+      if (!changed || !mounted) return;
+      setState(() {
+        _cameraReady = camera.isInitialized;
+        _calibStatus = camera.isInitialized
+            ? '${camera.cameraLabel} ready ✓'
+            : 'camera disconnected, connect a camera and rescan';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cameraReady = camera.isInitialized;
+        _calibStatus = 'camera change detected but preview could not start';
+      });
+    } finally {
+      _refreshingCameras = false;
     }
   }
 
@@ -146,6 +177,16 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
                             ? Colors.greenAccent
                             : Colors.orangeAccent)),
               ),
+            if (ref.read(cameraServiceProvider).isInitialized) ...[
+              const SizedBox(height: 16),
+              _cameraViewfinder(),
+              const SizedBox(height: 8),
+              Text(
+                'Live view: ${ref.read(cameraServiceProvider).cameraLabel}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
             const SizedBox(height: 32),
             FilledButton.icon(
               onPressed: _cameraReady ? _startShift : null,
@@ -155,6 +196,23 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
                   minimumSize: const Size.fromHeight(56)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cameraViewfinder() {
+    final controller = ref.read(cameraServiceProvider).controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: ColoredBox(
+        color: Colors.black,
+        child: AspectRatio(
+          aspectRatio: controller.value.aspectRatio,
+          child: CameraPreview(controller),
         ),
       ),
     );

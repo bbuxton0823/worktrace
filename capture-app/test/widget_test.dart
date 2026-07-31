@@ -30,7 +30,16 @@ class FakeCamera implements CaptureCamera {
   bool get isUsbCamera => false;
 
   @override
-  Future<bool> initialize() async => true;
+  bool get hasExternalCamera => false;
+
+  @override
+  String get cameraLabel => 'fake front camera';
+
+  @override
+  Future<bool> initialize({bool refresh = false}) async => true;
+
+  @override
+  Future<bool> refreshIfCameraListChanged() async => false;
 
   @override
   Future<void> startRecording() async {
@@ -285,5 +294,27 @@ void main() {
     expect(session.current.handCoverage, isNull);
     expect(session.current.videoPath, isNull);
     expect(session.current.taskMarkers, isEmpty);
+  });
+
+  test('External cameras are preferred ahead of phone cameras', () {
+    const rear = CameraDescription(
+      name: '0',
+      lensDirection: CameraLensDirection.back,
+      sensorOrientation: 90,
+    );
+    const front = CameraDescription(
+      name: '1',
+      lensDirection: CameraLensDirection.front,
+      sensorOrientation: 270,
+    );
+    const external = CameraDescription(
+      name: 'usb-0',
+      lensDirection: CameraLensDirection.external,
+      sensorOrientation: 0,
+    );
+
+    final ordered = preferredCameraOrder([rear, front, external]);
+
+    expect(ordered.map((camera) => camera.name), ['usb-0', '1', '0']);
   });
 }

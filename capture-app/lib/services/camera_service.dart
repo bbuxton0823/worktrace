@@ -8,8 +8,11 @@ abstract class CaptureCamera {
   CameraController? get controller;
   bool get isInitialized;
   bool get isUsbCamera;
+  bool get hasExternalCamera;
+  String get cameraLabel;
 
-  Future<bool> initialize();
+  Future<bool> initialize({bool refresh = false});
+  Future<bool> refreshIfCameraListChanged();
   Future<void> startRecording();
   Future<XFile?> stopRecording();
   Future<void> dispose();
@@ -41,6 +44,8 @@ class RecordingStopper {
 
 class CameraService implements CaptureCamera {
   CameraController? _controller;
+  String _cameraSignature = '';
+  bool _hasExternalCamera = false;
 
   @override
   CameraController? get controller => _controller;
@@ -53,8 +58,27 @@ class CameraService implements CaptureCamera {
       _controller?.description.lensDirection == CameraLensDirection.external;
 
   @override
-  Future<bool> initialize() async {
-    if (isInitialized) return true;
+  bool get hasExternalCamera => _hasExternalCamera;
+
+  @override
+  String get cameraLabel {
+    final active = _controller?.description;
+    if (active == null) return 'no camera selected';
+    if (active.lensDirection == CameraLensDirection.external) {
+      return 'USB/external camera (${active.name})';
+    }
+    final side = active.lensDirection == CameraLensDirection.front
+        ? 'front camera'
+        : 'rear camera';
+    if (_hasExternalCamera) {
+      return '$side (${active.name}), external camera could not be opened';
+    }
+    return '$side (${active.name}), USB camera not detected by Android';
+  }
+
+  @override
+  Future<bool> initialize({bool refresh = false}) async {
+    if (isInitialized && !refresh) return true;
 
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
@@ -65,29 +89,54 @@ class CameraService implements CaptureCamera {
     }
 
     final cameras = await availableCameras();
-    if (cameras.isEmpty) return false;
+    _cameraSignature = _signature(cameras);
+    return _configure(cameras);
+  }
 
-    final selected = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
+  @override
+  Future<bool> refreshIfCameraListChanged() async {
+    final cameras = await availableCameras();
+    final nextSignature = _signature(cameras);
+    if (nextSignature == _cameraSignature) return false;
+    _cameraSignature = nextSignature;
+    await _configure(cameras);
+    return true;
+  }
+
+  Future<bool> _configure(List<CameraDescription> cameras) async {
+    _hasExternalCamera = cameras.any(
+      (camera) => camera.lensDirection == CameraLensDirection.external,
     );
     final previous = _controller;
     _controller = null;
     await previous?.dispose();
 
-    final nextController = CameraController(
-      selected,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    try {
-      await nextController.initialize();
-      _controller = nextController;
-      return true;
-    } catch (_) {
-      await nextController.dispose();
-      rethrow;
+    Object? lastError;
+    for (final candidate in preferredCameraOrder(cameras)) {
+      final nextController = CameraController(
+        candidate,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      try {
+        await nextController.initialize();
+        _controller = nextController;
+        return true;
+      } catch (error) {
+        lastError = error;
+        await nextController.dispose();
+      }
     }
+    if (lastError != null) throw lastError;
+    return false;
+  }
+
+  String _signature(List<CameraDescription> cameras) {
+    final entries = cameras
+        .map((camera) => '${camera.name}:${camera.lensDirection.name}')
+        .toList()
+      ..sort();
+    return entries.join('|');
   }
 
   @override
@@ -121,6 +170,23 @@ class CameraService implements CaptureCamera {
     _controller = null;
     await active?.dispose();
   }
+}
+
+List<CameraDescription> preferredCameraOrder(
+  List<CameraDescription> cameras,
+) {
+  final indexed = cameras.indexed.toList();
+  int priority(CameraLensDirection direction) => switch (direction) {
+        CameraLensDirection.external => 0,
+        CameraLensDirection.front => 1,
+        CameraLensDirection.back => 2,
+      };
+  indexed.sort((a, b) {
+    final directionOrder =
+        priority(a.$2.lensDirection).compareTo(priority(b.$2.lensDirection));
+    return directionOrder != 0 ? directionOrder : a.$1.compareTo(b.$1);
+  });
+  return indexed.map((entry) => entry.$2).toList();
 }
 
 final cameraServiceProvider = Provider<CaptureCamera>((ref) {

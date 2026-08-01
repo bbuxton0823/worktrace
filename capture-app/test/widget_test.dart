@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:egodata_app/screens/recording_screen.dart';
@@ -14,14 +15,18 @@ import 'package:egodata_app/services/session_provider.dart';
 import 'package:egodata_app/services/upload_service.dart';
 
 class FakeCamera implements CaptureCamera {
-  FakeCamera(this.file);
+  FakeCamera(this.file, {this.backgroundRecording = false});
 
   final XFile file;
+  final bool backgroundRecording;
   int startCalls = 0;
   int stopCalls = 0;
 
   @override
-  CameraController? get controller => null;
+  double get aspectRatio => 16 / 9;
+
+  @override
+  Widget buildPreview() => const SizedBox.shrink();
 
   @override
   bool get isInitialized => true;
@@ -31,6 +36,9 @@ class FakeCamera implements CaptureCamera {
 
   @override
   bool get hasExternalCamera => false;
+
+  @override
+  bool get supportsBackgroundRecording => backgroundRecording;
 
   @override
   String get cameraLabel => 'fake front camera';
@@ -172,6 +180,63 @@ void main() {
     expect(interruptedFile?.path, source.path);
     expect(endShiftFile?.path, source.path);
     expect(camera.stopCalls, 1);
+  });
+
+  testWidgets('Wearable recording continues when the screen turns off',
+      (tester) async {
+    const channel = MethodChannel('worktrace/capture_service');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async => null);
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+    tester.view.physicalSize = const Size(1080, 2520);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final temp = Directory.systemTemp.createTempSync('worktrace-background-');
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final source = File('${temp.path}/camera-output.mp4');
+    source.writeAsBytesSync([0, 1, 2, 3]);
+    final camera = FakeCamera(
+      XFile(source.path),
+      backgroundRecording: true,
+    );
+    final episodeWriter = FakeEpisodeWriter();
+    final session = SessionNotifier()
+      ..start('wearable-worker', 'kitchen_clean');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          cameraServiceProvider.overrideWithValue(camera),
+          episodeStoreProvider.overrideWithValue(episodeWriter),
+          sessionProvider.overrideWith((_) => session),
+        ],
+        child: MaterialApp(
+          home: const RecordingScreen(),
+          routes: {'/shift-end': (_) => const ShiftEndScreen()},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+
+    expect(camera.stopCalls, 0);
+    expect(session.current.isRecording, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.tap(find.byTooltip('End shift'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(camera.stopCalls, 1);
+    expect(episodeWriter.saveCalls, 1);
+    expect(find.text('Shift Complete'), findsOneWidget);
   });
 
   test('A pre-recording lifecycle stop does not consume the final stop',

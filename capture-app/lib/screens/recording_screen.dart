@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/camera_service.dart';
+import '../services/capture_keep_alive.dart';
 import '../services/episode_store.dart';
 import '../services/session_provider.dart';
 
@@ -24,6 +25,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
   bool _initializing = true;
   bool _ending = false;
   bool _interrupted = false;
+  bool _keepAliveStarted = false;
   String? _cameraError;
 
   static const _taskChips = [
@@ -58,11 +60,16 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
     try {
       final ready = _camera.isInitialized || await _camera.initialize();
       if (!ready) throw StateError('No camera is available.');
+      if (_camera.supportsBackgroundRecording) {
+        await CaptureKeepAlive.start();
+        _keepAliveStarted = true;
+      }
       await _camera.startRecording();
       if (!mounted) return;
       setState(() => _initializing = false);
       _startTimer();
     } catch (_) {
+      await _stopKeepAlive();
       if (!mounted) return;
       ref
           .read(sessionProvider.notifier)
@@ -95,6 +102,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
   }
 
   Future<void> _handleInterruption() async {
+    if (_camera.supportsBackgroundRecording) return;
     _timer?.cancel();
     try {
       await _stopCameraOnce();
@@ -115,6 +123,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
 
     try {
       final recorded = await _stopCameraOnce();
+      await _stopKeepAlive();
       if (recorded == null) {
         throw StateError('No completed video file was returned by the camera.');
       }
@@ -132,6 +141,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/shift-end');
     } catch (_) {
+      await _stopKeepAlive();
       ref
           .read(sessionProvider.notifier)
           .failCapture('The episode could not be saved.');
@@ -141,6 +151,16 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
         _cameraError =
             'The episode could not be saved. The upload step is disabled.';
       });
+    }
+  }
+
+  Future<void> _stopKeepAlive() async {
+    if (!_keepAliveStarted) return;
+    _keepAliveStarted = false;
+    try {
+      await CaptureKeepAlive.stop();
+    } catch (_) {
+      // Recording teardown must continue even if the service already stopped.
     }
   }
 
@@ -317,8 +337,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
   }
 
   Widget _cameraView() {
-    final controller = _camera.controller;
-    if (controller == null || !controller.value.isInitialized) {
+    if (!_camera.isInitialized) {
       return Center(
         child: Text(
           _initializing ? 'Starting camera...' : 'Camera unavailable',
@@ -328,8 +347,8 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen>
     }
     return Center(
       child: AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
+        aspectRatio: _camera.aspectRatio,
+        child: _camera.buildPreview(),
       ),
     );
   }

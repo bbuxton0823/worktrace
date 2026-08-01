@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.uvccamera</groupId>
+  <artifactId>lib</artifactId>
+  <version>0.0.13-worktrace</version>
+  <packaging>aar</packaging>
+  <name>Worktrace UVCCamera 16 KB rebuild</name>
+  <description>Official UVCCamera 0.0.13 source rebuilt with NDK 28 and 16 KB page alignment.</description>
+  <url>https://github.com/alexey-pelykh/UVCCamera/tree/0.0.13</url>
+  <licenses>
+    <license>
+      <name>Apache License Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+</project>

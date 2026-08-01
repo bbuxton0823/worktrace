@@ -1,0 +1,22 @@
+diff --git a/lib/build.gradle.kts b/lib/build.gradle.kts
+index 4fe5db4..a12f70b 100644
+--- a/lib/build.gradle.kts
++++ b/lib/build.gradle.kts
+@@ -10,6 +10,7 @@ android {
+     namespace = "org.uvccamera.lib"
+     compileSdk = 34
++    ndkVersion = "28.2.13676358"
+ 
+     defaultConfig {
+         minSdk = 21
+diff --git a/lib/src/main/jni/Application.mk b/lib/src/main/jni/Application.mk
+index 47418dd..9c47779 100644
+--- a/lib/src/main/jni/Application.mk
++++ b/lib/src/main/jni/Application.mk
+@@ -27,6 +27,8 @@
+ APP_PLATFORM := android-21
+ APP_ABI := armeabi-v7a arm64-v8a
++APP_SUPPORT_FLEXIBLE_PAGE_SIZES := true
++APP_LDFLAGS += -Wl,-z,max-page-size=16384
+ #APP_OPTIM := debug
+ APP_OPTIM := release

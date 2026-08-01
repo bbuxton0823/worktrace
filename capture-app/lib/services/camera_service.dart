@@ -1,16 +1,21 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
+import 'package:camera/camera.dart' as phone;
+import 'package:cross_file/cross_file.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:uvccamera/uvccamera.dart' as uvc;
 
 abstract class CaptureCamera {
-  CameraController? get controller;
   bool get isInitialized;
   bool get isUsbCamera;
   bool get hasExternalCamera;
+  bool get supportsBackgroundRecording;
   String get cameraLabel;
+  double get aspectRatio;
 
+  Widget buildPreview();
   Future<bool> initialize({bool refresh = false});
   Future<bool> refreshIfCameraListChanged();
   Future<void> startRecording();
@@ -43,37 +48,73 @@ class RecordingStopper {
 }
 
 class CameraService implements CaptureCamera {
-  CameraController? _controller;
+  static const _elpVendorId = 0x32e4;
+  static const _elpProductId = 0x9230;
+
+  phone.CameraController? _phoneController;
+  uvc.UvcCameraController? _uvcController;
   String _cameraSignature = '';
   bool _hasExternalCamera = false;
+  bool _uvcOpenFailed = false;
 
   @override
-  CameraController? get controller => _controller;
+  bool get isInitialized =>
+      (_uvcController?.value.isInitialized ?? false) ||
+      (_phoneController?.value.isInitialized ?? false);
 
   @override
-  bool get isInitialized => _controller?.value.isInitialized ?? false;
-
-  @override
-  bool get isUsbCamera =>
-      _controller?.description.lensDirection == CameraLensDirection.external;
+  bool get isUsbCamera => _uvcController?.value.isInitialized ?? false;
 
   @override
   bool get hasExternalCamera => _hasExternalCamera;
 
   @override
+  bool get supportsBackgroundRecording => isUsbCamera;
+
+  @override
   String get cameraLabel {
-    final active = _controller?.description;
-    if (active == null) return 'no camera selected';
-    if (active.lensDirection == CameraLensDirection.external) {
-      return 'USB/external camera (${active.name})';
+    final external = _uvcController;
+    if (external != null && external.value.isInitialized) {
+      final device = external.device;
+      return 'ELP USB camera '
+          '(${device.vendorId.toRadixString(16)}:'
+          '${device.productId.toRadixString(16)})';
     }
-    final side = active.lensDirection == CameraLensDirection.front
+
+    final active = _phoneController?.description;
+    if (active == null) return 'no camera selected';
+    final side = active.lensDirection == phone.CameraLensDirection.front
         ? 'front camera'
         : 'rear camera';
+    if (_uvcOpenFailed) {
+      return '$side (${active.name}), ELP detected but could not be opened';
+    }
     if (_hasExternalCamera) {
       return '$side (${active.name}), external camera could not be opened';
     }
     return '$side (${active.name}), USB camera not detected by Android';
+  }
+
+  @override
+  double get aspectRatio {
+    final external = _uvcController;
+    if (external != null && external.value.isInitialized) {
+      return external.value.previewMode?.aspectRatio ?? (16 / 9);
+    }
+    return _phoneController?.value.aspectRatio ?? (16 / 9);
+  }
+
+  @override
+  Widget buildPreview() {
+    final external = _uvcController;
+    if (external != null && external.value.isInitialized) {
+      return uvc.UvcCameraPreview(external);
+    }
+    final active = _phoneController;
+    if (active != null && active.value.isInitialized) {
+      return phone.CameraPreview(active);
+    }
+    return const SizedBox.shrink();
   }
 
   @override
@@ -82,68 +123,132 @@ class CameraService implements CaptureCamera {
 
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
-      throw CameraException(
+      throw phone.CameraException(
         'CameraAccessDenied',
         'Camera permission is required to record an episode.',
       );
     }
 
-    final cameras = await availableCameras();
-    _cameraSignature = _signature(cameras);
-    return _configure(cameras);
+    final uvcDevices = await _listUvcDevices();
+    final phoneCameras = await phone.availableCameras();
+    _cameraSignature = _signature(uvcDevices, phoneCameras);
+    return _configure(uvcDevices, phoneCameras);
   }
 
   @override
   Future<bool> refreshIfCameraListChanged() async {
-    final cameras = await availableCameras();
-    final nextSignature = _signature(cameras);
+    final uvcDevices = await _listUvcDevices();
+    final phoneCameras = await phone.availableCameras();
+    final nextSignature = _signature(uvcDevices, phoneCameras);
     if (nextSignature == _cameraSignature) return false;
     _cameraSignature = nextSignature;
-    await _configure(cameras);
+    await _configure(uvcDevices, phoneCameras);
     return true;
   }
 
-  Future<bool> _configure(List<CameraDescription> cameras) async {
-    _hasExternalCamera = cameras.any(
-      (camera) => camera.lensDirection == CameraLensDirection.external,
-    );
-    final previous = _controller;
-    _controller = null;
-    await previous?.dispose();
+  Future<Map<String, uvc.UvcCameraDevice>> _listUvcDevices() async {
+    try {
+      if (!await uvc.UvcCamera.isSupported()) return const {};
+      return await uvc.UvcCamera.getDevices();
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<bool> _configure(
+    Map<String, uvc.UvcCameraDevice> uvcDevices,
+    List<phone.CameraDescription> phoneCameras,
+  ) async {
+    _hasExternalCamera = uvcDevices.isNotEmpty ||
+        phoneCameras.any(
+          (camera) =>
+              camera.lensDirection == phone.CameraLensDirection.external,
+        );
+    _uvcOpenFailed = false;
+    await _disposeControllers();
+
+    final external = _preferredUvcDevice(uvcDevices.values);
+    if (external != null) {
+      final next = uvc.UvcCameraController(
+        device: external,
+        resolutionPreset: uvc.UvcCameraResolutionPreset.high,
+      );
+      try {
+        final granted = await uvc.UvcCamera.requestDevicePermission(external);
+        if (!granted) throw StateError('USB camera permission was denied.');
+        await next.initialize();
+        _uvcController = next;
+        return true;
+      } catch (_) {
+        _uvcOpenFailed = true;
+        await _safeDisposeUvc(next);
+      }
+    }
 
     Object? lastError;
-    for (final candidate in preferredCameraOrder(cameras)) {
-      final nextController = CameraController(
+    for (final candidate in preferredCameraOrder(phoneCameras)) {
+      final next = phone.CameraController(
         candidate,
-        ResolutionPreset.high,
+        phone.ResolutionPreset.high,
         enableAudio: false,
       );
       try {
-        await nextController.initialize();
-        _controller = nextController;
+        await next.initialize();
+        _phoneController = next;
         return true;
       } catch (error) {
         lastError = error;
-        await nextController.dispose();
+        await next.dispose();
       }
     }
     if (lastError != null) throw lastError;
     return false;
   }
 
-  String _signature(List<CameraDescription> cameras) {
-    final entries = cameras
-        .map((camera) => '${camera.name}:${camera.lensDirection.name}')
-        .toList()
-      ..sort();
+  uvc.UvcCameraDevice? _preferredUvcDevice(
+    Iterable<uvc.UvcCameraDevice> devices,
+  ) {
+    uvc.UvcCameraDevice? first;
+    for (final device in devices) {
+      first ??= device;
+      if (device.vendorId == _elpVendorId &&
+          device.productId == _elpProductId) {
+        return device;
+      }
+    }
+    return first;
+  }
+
+  String _signature(
+    Map<String, uvc.UvcCameraDevice> uvcDevices,
+    List<phone.CameraDescription> phoneCameras,
+  ) {
+    final entries = <String>[
+      ...uvcDevices.values.map(
+        (device) => 'uvc:${device.name}:${device.vendorId}:${device.productId}',
+      ),
+      ...phoneCameras.map(
+        (camera) => 'phone:${camera.name}:${camera.lensDirection.name}',
+      ),
+    ]..sort();
     return entries.join('|');
   }
 
   @override
   Future<void> startRecording() async {
-    final active = _controller;
+    final external = _uvcController;
+    if (external != null && external.value.isInitialized) {
+      final mode = external.value.previewMode;
+      if (mode == null) throw StateError('ELP preview mode is unavailable.');
+      if (!external.value.isRecordingVideo) {
+        await external.startVideoRecording(mode);
+      }
+      return;
+    }
+
+    final active = _phoneController;
     if (active == null || !active.value.isInitialized) {
-      throw CameraException(
+      throw phone.CameraException(
         'Uninitialized CameraController',
         'The camera must be ready before recording starts.',
       );
@@ -155,7 +260,14 @@ class CameraService implements CaptureCamera {
 
   @override
   Future<XFile?> stopRecording() async {
-    final active = _controller;
+    final external = _uvcController;
+    if (external != null &&
+        external.value.isInitialized &&
+        external.value.isRecordingVideo) {
+      return external.stopVideoRecording();
+    }
+
+    final active = _phoneController;
     if (active == null ||
         !active.value.isInitialized ||
         !active.value.isRecordingVideo) {
@@ -164,22 +276,35 @@ class CameraService implements CaptureCamera {
     return active.stopVideoRecording();
   }
 
-  @override
-  Future<void> dispose() async {
-    final active = _controller;
-    _controller = null;
-    await active?.dispose();
+  Future<void> _disposeControllers() async {
+    final phoneController = _phoneController;
+    final uvcController = _uvcController;
+    _phoneController = null;
+    _uvcController = null;
+    await phoneController?.dispose();
+    if (uvcController != null) await _safeDisposeUvc(uvcController);
   }
+
+  Future<void> _safeDisposeUvc(uvc.UvcCameraController controller) async {
+    try {
+      await controller.dispose();
+    } catch (_) {
+      // A failed USB open may leave an initialization future with an error.
+    }
+  }
+
+  @override
+  Future<void> dispose() => _disposeControllers();
 }
 
-List<CameraDescription> preferredCameraOrder(
-  List<CameraDescription> cameras,
+List<phone.CameraDescription> preferredCameraOrder(
+  List<phone.CameraDescription> cameras,
 ) {
   final indexed = cameras.indexed.toList();
-  int priority(CameraLensDirection direction) => switch (direction) {
-        CameraLensDirection.external => 0,
-        CameraLensDirection.front => 1,
-        CameraLensDirection.back => 2,
+  int priority(phone.CameraLensDirection direction) => switch (direction) {
+        phone.CameraLensDirection.external => 0,
+        phone.CameraLensDirection.front => 1,
+        phone.CameraLensDirection.back => 2,
       };
   indexed.sort((a, b) {
     final directionOrder =

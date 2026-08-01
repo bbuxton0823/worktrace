@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/session_provider.dart';
@@ -202,8 +201,8 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
   }
 
   Widget _cameraViewfinder() {
-    final controller = ref.read(cameraServiceProvider).controller;
-    if (controller == null || !controller.value.isInitialized) {
+    final camera = ref.read(cameraServiceProvider);
+    if (!camera.isInitialized) {
       return const SizedBox.shrink();
     }
     return ClipRRect(
@@ -211,8 +210,8 @@ class _ShiftStartScreenState extends ConsumerState<ShiftStartScreen> {
       child: ColoredBox(
         color: Colors.black,
         child: AspectRatio(
-          aspectRatio: controller.value.aspectRatio,
-          child: CameraPreview(controller),
+          aspectRatio: camera.aspectRatio,
+          child: camera.buildPreview(),
         ),
       ),
     );
